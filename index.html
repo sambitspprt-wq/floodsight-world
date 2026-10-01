@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FloodSight · Urban Flood Forecasting (World)</title>
+<style>
+  :root{
+    --bg:#05070d;
+    --bg2:#080b14;
+    --panel:rgba(255,255,255,.035);
+    --panel-strong:rgba(255,255,255,.06);
+    --line:rgba(255,255,255,.09);
+    --text:#e7ecf5;
+    --muted:#8b94a7;
+    --muted2:#5c6675;
+    --cyan:#38bdf8;
+    --cyan2:#22d3ee;
+    --violet:#818cf8;
+    --green:#34d399;
+    --yellow:#fbbf24;
+    --orange:#fb923c;
+    --red:#f87171;
+    --crimson:#f43f5e;
+    --radius:16px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+    -webkit-font-smoothing:antialiased;line-height:1.55;
+  }
+  /* backdrop glows */
+  .bgfx{position:fixed;inset:0;z-index:-2;overflow:hidden;
+    background:
+      radial-gradient(1100px 600px at 80% -10%, rgba(56,189,248,.16), transparent 60%),
+      radial-gradient(900px 600px at 10% 10%, rgba(129,140,248,.12), transparent 55%),
+      radial-gradient(1200px 800px at 50% 120%, rgba(34,211,238,.10), transparent 60%),
+      var(--bg);
+  }
+  .grid{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(1200px 800px at 50% 0%,#000 30%,transparent 75%);
+            mask-image:radial-gradient(1200px 800px at 50% 0%,#000 30%,transparent 75%);
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  a{color:inherit;text-decoration:none}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+    background:rgba(5,7,13,.72);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px}
+  .brand .logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 22px rgba(56,189,248,.45)}
+  .brand .logo svg{width:18px;height:18px}
+  .nav-links{display:flex;gap:26px;align-items:center;font-size:14px;color:var(--muted)}
+  .nav-links a:hover{color:var(--text)}
+  .nav-links .live{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--green);
+    border:1px solid rgba(52,211,153,.35);padding:6px 12px;border-radius:999px;background:rgba(52,211,153,.08)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);position:relative}
+  .dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--green);opacity:.6;animation:ping 1.6s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.4);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:88px 0 56px;text-align:center;position:relative}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;letter-spacing:1.6px;
+    color:var(--cyan2);border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.07);
+    padding:7px 16px;border-radius:999px;text-transform:uppercase}
+  .hero h1{font-size:clamp(38px,6.4vw,68px);line-height:1.05;letter-spacing:-.02em;margin:26px 0 18px;font-weight:800}
+  .hero h1 .grad{background:linear-gradient(90deg,var(--cyan2),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.sub{max-width:640px;margin:0 auto;color:var(--muted);font-size:17.5px}
+  .hero .cta{margin-top:34px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;border-radius:12px;
+    padding:13px 24px;cursor:pointer;transition:.18s;border:1px solid transparent}
+  .btn.primary{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;box-shadow:0 10px 34px rgba(56,189,248,.35)}
+  .btn.primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(56,189,248,.45)}
+  .btn.ghost{border-color:var(--line);color:var(--text);background:rgba(255,255,255,.03)}
+  .btn.ghost:hover{background:rgba(255,255,255,.07)}
+  .hero .note{margin-top:22px;font-size:13px;color:var(--muted2)}
+
+  /* radar visual */
+  .radar{width:340px;height:340px;margin:44px auto 0;position:relative;opacity:.95}
+  .radar .ring{position:absolute;border:1px solid rgba(56,189,248,.22);border-radius:50%;inset:0}
+  .radar .ring.r2{inset:38px}.radar .ring.r3{inset:76px}.radar .ring.r4{inset:114px}
+  .radar .cross{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(56,189,248,.15)}
+  .radar .cross.h{left:0;right:0;top:50%;height:1px;width:auto;bottom:auto}
+  .radar .sweep{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(56,189,248,.5), rgba(56,189,248,.05) 70deg, transparent 70deg);
+    animation:spin 4.2s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .radar .blip{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--cyan2);
+    box-shadow:0 0 16px var(--cyan2)}
+  .radar .b1{left:58%;top:34%;animation:blink 1.8s ease-in-out infinite}
+  .radar .b2{left:30%;top:62%;animation:blink 2.6s ease-in-out infinite .5s}
+  .radar .b3{left:64%;top:68%;animation:blink 2.1s ease-in-out infinite .9s}
+  @keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+
+  /* ---------- sections ---------- */
+  section{padding:64px 0}
+  .sec-tag{font-size:12.5px;font-weight:700;letter-spacing:2.4px;color:var(--cyan2);text-transform:uppercase}
+  .sec-title{font-size:clamp(26px,3.4vw,38px);font-weight:800;letter-spacing:-.02em;margin:10px 0 12px}
+  .sec-sub{color:var(--muted);max-width:660px;font-size:16px}
+
+  /* ---------- dashboard ---------- */
+  .dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+  .picker{position:relative;width:100%;max-width:430px}
+  .picker .row{display:flex;gap:8px}
+  .picker input{flex:1;background:var(--panel-strong);border:1px solid var(--line);border-radius:12px;
+    color:var(--text);padding:13px 16px;font-size:15px;outline:none;transition:.15s}
+  .picker input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(56,189,248,.15)}
+  .picker input::placeholder{color:var(--muted2)}
+  .picker button{border:1px solid var(--line);background:var(--panel-strong);color:var(--text);border-radius:12px;
+    padding:0 16px;font-size:14px;cursor:pointer;white-space:nowrap}
+  .picker button:hover{background:rgba(255,255,255,.09)}
+  .picker .suggest{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:40;background:#0c111c;
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:330px;overflow-y:auto;display:none;
+    box-shadow:0 24px 60px rgba(0,0,0,.55)}
+  .picker .suggest.open{display:block}
+  .suggest .item{padding:11px 16px;cursor:pointer;font-size:14.5px;display:flex;justify-content:space-between;gap:10px}
+  .suggest .item:hover{background:rgba(56,189,248,.09)}
+  .suggest .item .st{color:var(--muted2);font-size:12.5px}
+  .suggest .item.hd{color:var(--muted2);font-size:11.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 16px 5px;cursor:default;background:rgba(255,255,255,.02)}
+  .suggest .item.hd:hover{background:rgba(255,255,255,.02)}
+  .suggest .item.searchonline{color:var(--cyan2);font-weight:600}
+
+  .live-chip{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+  .live-chip .clock{font-family:var(--mono);color:var(--muted2)}
+
+  /* city banner */
+  .city-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:20px 24px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);margin-bottom:18px}
+  .city-banner .name{font-size:22px;font-weight:800}
+  .city-banner .meta{color:var(--muted);font-size:13.5px;display:flex;gap:14px;flex-wrap:wrap;margin-top:3px}
+  .city-banner .meta span{display:inline-flex;align-items:center;gap:6px}
+  .refresh{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel-strong);
+    color:var(--text);font-size:13.5px;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer}
+  .refresh:hover{background:rgba(255,255,255,.09)}
+  .refresh svg{width:14px;height:14px}
+  .refresh.spin svg{animation:spin .7s linear infinite}
+
+  /* metric grid */
+  .metrics{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:22px}
+  .card .k{font-size:12.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted2);font-weight:700}
+  .card.gauge-card{grid-column:span 4}
+  .card.stats-card{grid-column:span 8;display:flex;flex-direction:column}
+  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px;flex:1}
+  .stat{border:1px solid var(--line);border-radius:13px;background:var(--panel-strong);padding:16px}
+  .stat .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+  .stat .v small{font-size:13px;color:var(--muted);font-weight:600}
+  .stat .lbl{font-size:12.5px;color:var(--muted)}
+
+  /* gauge */
+  .gauge-wrap{display:flex;align-items:center;gap:20px;margin-top:10px}
+  .gauge{position:relative;width:170px;height:170px;flex-shrink:0}
+  .gauge svg{transform:rotate(-90deg)}
+  .gauge .num{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+  .gauge .num b{font-size:34px;font-weight:800;letter-spacing:-.02em}
+  .gauge .num span{font-size:11.5px;color:var(--muted2);letter-spacing:1.4px;text-transform:uppercase;font-weight:700}
+  .risk-label{display:inline-flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;font-size:15px;
+    padding:7px 14px;border-radius:999px;border:1px solid}
+  .risk-note{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.5}
+
+  /* wide panels */
+  .panel-row{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;margin-top:16px}
+  @media(max-width:900px){.panel-row{grid-template-columns:1fr}
+    .card.gauge-card,.card.stats-card{grid-column:span 12}
+    .stats-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.stats-grid{grid-template-columns:1fr 1fr}}
+
+  .bars{margin-top:16px;display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
+  .bar-row .zone-name{font-size:14.5px;font-weight:600}
+  .bar-row .zone-val{font-family:var(--mono);font-size:13.5px;font-weight:700}
+  .bar-track{grid-column:1/-1;height:9px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+  .chip{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;letter-spacing:.3px;border:1px solid}
+
+  /* alerts */
+  .alerts{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+  .alert{display:flex;gap:14px;padding:14px 16px;border:1px solid var(--line);border-left:4px solid;border-radius:12px;background:var(--panel-strong)}
+  .alert .icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+  .alert .icon svg{width:17px;height:17px}
+  .alert .t{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .alert .d{font-size:13.5px;color:var(--muted);margin-top:3px}
+  .alert .life{display:flex;gap:6px;margin-top:8px;align-items:center;font-size:11px;color:var(--muted2)}
+  .alert .life i{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .alert .life i.pending{background:var(--muted2)}
+  .status{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+
+  /* factor table */
+  .factors{margin-top:16px;width:100%;border-collapse:collapse;font-size:13.5px}
+  .factors th{text-align:left;color:var(--muted2);font-weight:600;font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .factors td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .factors td:last-child{text-align:right;font-family:var(--mono)}
+  .factors .weight{color:var(--muted2);font-family:var(--mono)}
+
+  /* sparkline */
+  .spark{display:flex;align-items:flex-end;gap:2px;height:52px;margin-top:14px}
+  .spark i{flex:1;min-width:2px;background:linear-gradient(180deg,var(--cyan),var(--violet));border-radius:2px 2px 0 0;opacity:.9}
+  .spark-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted2);margin-top:6px;font-family:var(--mono)}
+  .dailies{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:16px}
+  .day{border:1px solid var(--line);border-radius:11px;padding:10px 6px;text-align:center;background:var(--panel-strong)}
+  .day .dn{font-size:11px;color:var(--muted2);font-weight:700}
+  .day .dd{font-size:11.5px;color:var(--muted);margin:4px 0 6px}
+  .day .dp{font-family:var(--mono);font-size:13px;font-weight:700}
+  .day.today{border-color:rgba(56,189,248,.5)}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px}
+  @media(max-width:900px){.steps{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.steps{grid-template-columns:1fr}}
+  .step{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:24px;position:relative;overflow:hidden}
+  .step::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--violet));opacity:.7}
+  .step .n{font-family:var(--mono);font-size:12.5px;color:var(--cyan2);font-weight:700;letter-spacing:1px}
+  .step h3{font-size:17px;margin:10px 0 8px;font-weight:750}
+  .step p{font-size:14px;color:var(--muted)}
+
+  footer{border-top:1px solid var(--line);padding:40px 0 60px;margin-top:40px}
+  footer .grid2{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
+  footer .disc{max-width:560px}
+  .loading{display:flex;align-items:center;gap:12px;color:var(--muted);padding:20px 0;font-size:15px}
+  .spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite}
+  .error-box{color:var(--red);font-size:14px}
+  .muted{color:var(--muted2)}
+</style>
+</head>
+<body>
+<div class="bgfx"></div>
+<div class="grid"></div>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.7s6.5 6.2 6.5 11a6.5 6.5 0 1 1-13 0c0-4.8 6.5-11 6.5-11z"/>
+          <path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5" opacity=".85"/>
+        </svg>
+      </span>
+      FloodSight <span style="color:var(--muted2);font-weight:600">· World</span>
+    </div>
+    <div class="nav-links">
+      <a href="#dashboard">Dashboard</a>
+      <a href="#how-it-works">How it works</a>
+      <span class="live"><span class="dot"></span> LIVE WEATHER</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero wrap">
+  <span class="badge">Software-only · Live weather feed</span>
+  <h1>See the storm before<br/>the streets do.</h1>
+  <p class="sub">A decision-support system for urban flood forecasting across the globe.
+    Blend live rainfall, terrain and historical patterns into one clear risk picture
+    for every city and town on Earth.</p>
+  <div class="cta">
+    <a class="btn primary" href="#dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+      View live dashboard
+    </a>
+    <a class="btn ghost" href="#how-it-works">How it works</a>
+  </div>
+  <p class="note">Built as an academic software prototype · no hardware required</p>
+
+  <div class="radar" aria-hidden="true">
+    <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div><div class="ring r4"></div>
+    <div class="cross"></div><div class="cross h"></div>
+    <div class="sweep"></div>
+    <div class="blip b1"></div><div class="blip b2"></div><div class="blip b3"></div>
+  </div>
+</header>
+
+<!-- ================= DASHBOARD ================= -->
+<section id="dashboard" class="wrap">
+  <span class="sec-tag">Risk overview</span>
+  <h2 class="sec-title">Live urban flood risk, city by city</h2>
+  <p class="sec-sub">Pick any city — or search any town anywhere in the world — and FloodSight fuses the live
+    weather feed with a static flood-proneness profile into a single, traceable risk score.</p>
+
+  <div class="dash-head" style="margin-top:34px">
+    <div class="picker">
+      <div class="row">
+        <input id="cityInput" type="text" placeholder="Search any city in the world… (e.g. London, Tokyo, Cuttack)" autocomplete="off" />
+        <button id="geoBtn" title="Search online">Search</button>
+      </div>
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="live-chip">
+      <span class="dot"></span> Live feed
+      <span class="clock" id="updatedAt">—</span>
+    </div>
+  </div>
+
+  <div class="city-banner">
+    <div>
+      <div class="name" id="cityName">Loading…</div>
+      <div class="meta" id="cityMeta"></div>
+    </div>
+    <button class="refresh" id="refreshBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div id="dashBody">
+    <div class="loading"><span class="spinner"></span> Fetching live weather…</div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="how-it-works" class="wrap">
+  <div style="text-align:left">
+    <span class="sec-tag">From signal to action</span>
+    <h2 class="sec-title">A clearer view of urban water risk.</h2>
+    <p class="sec-sub">FloodSight follows a workflow operators understand:
+      <strong style="color:var(--text)">ingest, enrich, predict, alert</strong>.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><span class="n">01</span><h3>Ingest</h3><p>Live weather and rainfall observations streamed from Open-Meteo for the selected location — updated every few minutes.</p></div>
+    <div class="step"><span class="n">02</span><h3>Enrich</h3><p>Terrain, land-use and historical flood signals encoded as a per-city flood-proneness profile.</p></div>
+    <div class="step"><span class="n">03</span><h3>Predict</h3><p>Configurable, transparent thresholds classify each zone's risk from 0–100% — every factor is traceable.</p></div>
+    <div class="step"><span class="n">04</span><h3>Alert</h3><p>Clear, traceable warnings with a lifecycle status: detected → triaged → active.</p></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap grid2">
+    <div class="disc">
+      <strong style="color:var(--text)">FloodSight · World</strong> — a software-only urban flood-forecasting
+      prototype. Risk scores are heuristic estimates built from live weather plus static city profiles,
+      and are <u>not</u> an official flood warning. Always follow your national meteorological service
+      and local disaster-authority advisories.
+    </div>
+    <div>
+      Data: <a href="https://open-meteo.com" target="_blank" rel="noopener" style="color:var(--cyan2)">Open-Meteo</a>
+      &nbsp;·&nbsp; Thresholds: standard heavy-rainfall categories
+      <div style="margin-top:8px;color:var(--muted2)">© 2026 · academic prototype · no hardware required</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   FLOODSIGHT · INDIA — risk model + UI
+   ============================================================ */
+'use strict';
+
+/* ---------- curated city directory (lat/lon + flood proneness 1–5) ---------- */
+const CITIES = [
+ {n:'Mumbai',s:'Maharashtra',lat:19.0760,lon:72.8777,fp:5},
+ {n:'Delhi',s:'Delhi',lat:28.6139,lon:77.2090,fp:3},
+ {n:'Bengaluru',s:'Karnataka',lat:12.9716,lon:77.5946,fp:3},
+ {n:'Hyderabad',s:'Telangana',lat:17.3850,lon:78.4867,fp:4},
+ {n:'Ahmedabad',s:'Gujarat',lat:23.0225,lon:72.5714,fp:4},
+ {n:'Chennai',s:'Tamil Nadu',lat:13.0827,lon:80.2707,fp:5},
+ {n:'Kolkata',s:'West Bengal',lat:22.5726,lon:88.3639,fp:5},
+ {n:'Surat',s:'Gujarat',lat:21.1702,lon:72.8311,fp:5},
+ {n:'Pune',s:'Maharashtra',lat:18.5204,lon:73.8567,fp:4},
+ {n:'Jaipur',s:'Rajasthan',lat:26.9124,lon:75.7873,fp:3},
+ {n:'Lucknow',s:'Uttar Pradesh',lat:26.8467,lon:80.9462,fp:4},
+ {n:'Kanpur',s:'Uttar Pradesh',lat:26.4499,lon:80.3319,fp:4},
+ {n:'Nagpur',s:'Maharashtra',lat:21.1458,lon:79.0882,fp:3},
+ {n:'Indore',s:'Madhya Pradesh',lat:22.7196,lon:75.8577,fp:3},
+ {n:'Bhopal',s:'Madhya Pradesh',lat:23.2599,lon:77.4126,fp:3},
+ {n:'Visakhapatnam',s:'Andhra Pradesh',lat:17.6868,lon:83.2185,fp:4},
+ {n:'Patna',s:'Bihar',lat:25.5941,lon:85.1376,fp:5},
+ {n:'Vadodara',s:'Gujarat',lat:22.3072,lon:73.1812,fp:4},
+ {n:'Ludhiana',s:'Punjab',lat:30.9010,lon:75.8573,fp:3},
+ {n:'Agra',s:'Uttar Pradesh',lat:27.1767,lon:78.0081,fp:3},
+ {n:'Nashik',s:'Maharashtra',lat:19.9975,lon:73.7898,fp:3},
+ {n:'Varanasi',s:'Uttar Pradesh',lat:25.3176,lon:82.9739,fp:5},
+ {n:'Meerut',s:'Uttar Pradesh',lat:28.9845,lon:77.7064,fp:3},
+ {n:'Rajkot',s:'Gujarat',lat:22.3039,lon:70.8022,fp:3},
+ {n:'Amritsar',s:'Punjab',lat:31.6340,lon:74.8723,fp:3},
+ {n:'Prayagraj',s:'Uttar Pradesh',lat:25.4358,lon:81.8463,fp:5},
+ {n:'Ranchi',s:'Jharkhand',lat:23.3441,lon:85.3096,fp:3},
+ {n:'Coimbatore',s:'Tamil Nadu',lat:11.0168,lon:76.9558,fp:3},
+ {n:'Jabalpur',s:'Madhya Pradesh',lat:23.1815,lon:79.9864,fp:3},
+ {n:'Gwalior',s:'Madhya Pradesh',lat:26.2183,lon:78.1828,fp:2},
+ {n:'Vijayawada',s:'Andhra Pradesh',lat:16.5062,lon:80.6480,fp:4},
+ {n:'Jodhpur',s:'Rajasthan',lat:26.2389,lon:73.0243,fp:1},
+ {n:'Madurai',s:'Tamil Nadu',lat:9.9252,lon:78.1198,fp:2},
+ {n:'Raipur',s:'Chhattisgarh',lat:21.2514,lon:81.6296,fp:3},
+ {n:'Kota',s:'Rajasthan',lat:25.2138,lon:75.8648,fp:2},
+ {n:'Guwahati',s:'Assam',lat:26.1445,lon:91.7362,fp:5},
+ {n:'Chandigarh',s:'Chandigarh',lat:30.7333,lon:76.7794,fp:2},
+ {n:'Thiruvananthapuram',s:'Kerala',lat:8.5241,lon:76.9366,fp:4},
+ {n:'Solapur',s:'Maharashtra',lat:17.6599,lon:75.9064,fp:2},
+ {n:'Hubballi',s:'Karnataka',lat:15.3647,lon:75.1240,fp:3},
+ {n:'Tiruchirappalli',s:'Tamil Nadu',lat:10.7905,lon:78.7047,fp:2},
+ {n:'Bhubaneswar',s:'Odisha',lat:20.2961,lon:85.8245,fp:4},
+ {n:'Cuttack',s:'Odisha',lat:20.4625,lon:85.8828,fp:5},
+ {n:'Puri',s:'Odisha',lat:19.8135,lon:85.8312,fp:5},
+ {n:'Rourkela',s:'Odisha',lat:22.2604,lon:84.8536,fp:4},
+ {n:'Balasore',s:'Odisha',lat:21.4927,lon:86.9334,fp:5},
+ {n:'Berhampur',s:'Odisha',lat:19.3149,lon:84.7941,fp:4},
+ {n:'Sambalpur',s:'Odisha',lat:21.4669,lon:83.9812,fp:4},
+ {n:'Mysuru',s:'Karnataka',lat:12.2958,lon:76.6394,fp:2},
+ {n:'Mangaluru',s:'Karnataka',lat:12.9141,lon:74.8560,fp:5},
+ {n:'Belagavi',s:'Karnataka',lat:15.8497,lon:74.4977,fp:3},
+ {n:'Kalaburagi',s:'Karnataka',lat:17.3297,lon:76.8343,fp:2},
+ {n:'Jamshedpur',s:'Jharkhand',lat:22.8046,lon:86.2029,fp:3},
+ {n:'Dhanbad',s:'Jharkhand',lat:23.7957,lon:86.4304,fp:3},
+ {n:'Bokaro',s:'Jharkhand',lat:23.6693,lon:86.1511,fp:3},
+ {n:'Gorakhpur',s:'Uttar Pradesh',lat:26.7606,lon:83.3732,fp:5},
+ {n:'Ghaziabad',s:'Uttar Pradesh',lat:28.6692,lon:77.4538,fp:3},
+ {n:'Bareilly',s:'Uttar Pradesh',lat:28.3670,lon:79.4304,fp:4},
+ {n:'Moradabad',s:'Uttar Pradesh',lat:28.8386,lon:78.7733,fp:4},
+ {n:'Gurugram',s:'Haryana',lat:28.4595,lon:77.0266,fp:4},
+ {n:'Faridabad',s:'Haryana',lat:28.4089,lon:77.3178,fp:3},
+ {n:'Panipat',s:'Haryana',lat:29.3909,lon:76.9635,fp:2},
+ {n:'Ambala',s:'Haryana',lat:30.3782,lon:76.7767,fp:3},
+ {n:'Hisar',s:'Haryana',lat:29.1492,lon:75.7217,fp:1},
+ {n:'Kochi',s:'Kerala',lat:9.9312,lon:76.2673,fp:5},
+ {n:'Kozhikode',s:'Kerala',lat:11.2588,lon:75.7804,fp:4},
+ {n:'Thrissur',s:'Kerala',lat:10.5276,lon:76.2144,fp:4},
+ {n:'Alappuzha',s:'Kerala',lat:9.4981,lon:76.3388,fp:5},
+ {n:'Dehradun',s:'Uttarakhand',lat:30.3165,lon:78.0322,fp:3},
+ {n:'Haridwar',s:'Uttarakhand',lat:29.9457,lon:78.1642,fp:4},
+ {n:'Nainital',s:'Uttarakhand',lat:29.3919,lon:79.4542,fp:1},
+ {n:'Srinagar',s:'Jammu & Kashmir',lat:34.0837,lon:74.7973,fp:5},
+ {n:'Jammu',s:'Jammu & Kashmir',lat:32.7266,lon:74.8570,fp:4},
+ {n:'Leh',s:'Ladakh',lat:34.1526,lon:77.5771,fp:1},
+ {n:'Shimla',s:'Himachal Pradesh',lat:31.1048,lon:77.1734,fp:2},
+ {n:'Dharamshala',s:'Himachal Pradesh',lat:32.2190,lon:76.3234,fp:2},
+ {n:'Gangtok',s:'Sikkim',lat:27.3389,lon:88.6065,fp:1},
+ {n:'Itanagar',s:'Arunachal Pradesh',lat:27.0844,lon:93.6053,fp:3},
+ {n:'Imphal',s:'Manipur',lat:24.8170,lon:93.9368,fp:4},
+ {n:'Aizawl',s:'Mizoram',lat:23.7271,lon:92.7176,fp:1},
+ {n:'Kohima',s:'Nagaland',lat:25.6751,lon:94.1086,fp:1},
+ {n:'Dimapur',s:'Nagaland',lat:25.8621,lon:93.7640,fp:4},
+ {n:'Shillong',s:'Meghalaya',lat:25.5788,lon:91.8933,fp:2},
+ {n:'Agartala',s:'Tripura',lat:23.8315,lon:91.2868,fp:5},
+ {n:'Dibrugarh',s:'Assam',lat:27.4728,lon:94.9120,fp:5},
+ {n:'Silchar',s:'Assam',lat:24.8333,lon:92.7789,fp:5},
+ {n:'Jorhat',s:'Assam',lat:26.7579,lon:94.2030,fp:4},
+ {n:'Gaya',s:'Bihar',lat:24.7914,lon:85.0002,fp:3},
+ {n:'Bhagalpur',s:'Bihar',lat:25.2425,lon:86.9842,fp:5},
+ {n:'Muzaffarpur',s:'Bihar',lat:26.1209,lon:85.3647,fp:5},
+ {n:'Darbhanga',s:'Bihar',lat:26.1542,lon:85.8918,fp:5},
+ {n:'Howrah',s:'West Bengal',lat:22.5958,lon:88.2636,fp:5},
+ {n:'Siliguri',s:'West Bengal',lat:26.7271,lon:88.3953,fp:4},
+ {n:'Durgapur',s:'West Bengal',lat:23.5204,lon:87.3119,fp:3},
+ {n:'Asansol',s:'West Bengal',lat:23.6739,lon:86.9524,fp:4},
+ {n:'Warangal',s:'Telangana',lat:17.9689,lon:79.5941,fp:3},
+ {n:'Karimnagar',s:'Telangana',lat:18.4386,lon:79.1288,fp:2},
+ {n:'Tirupati',s:'Andhra Pradesh',lat:13.6288,lon:79.4192,fp:2},
+ {n:'Nellore',s:'Andhra Pradesh',lat:14.4426,lon:79.9865,fp:4},
+ {n:'Rajahmundry',s:'Andhra Pradesh',lat:17.0005,lon:81.8040,fp:4},
+ {n:'Guntur',s:'Andhra Pradesh',lat:16.3067,lon:80.4365,fp:4},
+ {n:'Kurnool',s:'Andhra Pradesh',lat:15.8281,lon:78.0373,fp:3},
+ {n:'Panaji',s:'Goa',lat:15.4909,lon:73.8278,fp:5},
+ {n:'Margao',s:'Goa',lat:15.2832,lon:73.9862,fp:5},
+ {n:'Bilaspur',s:'Chhattisgarh',lat:22.0797,lon:82.1409,fp:2},
+ {n:'Durg',s:'Chhattisgarh',lat:21.1904,lon:81.2849,fp:2},
+ {n:'Ujjain',s:'Madhya Pradesh',lat:23.1765,lon:75.7885,fp:2},
+ {n:'Salem',s:'Tamil Nadu',lat:11.6643,lon:78.1460,fp:2},
+ {n:'Vellore',s:'Tamil Nadu',lat:12.9165,lon:79.1325,fp:3},
+ {n:'Kolhapur',s:'Maharashtra',lat:16.7050,lon:74.2433,fp:5},
+ {n:'Chh. Sambhajinagar',s:'Maharashtra',lat:19.8762,lon:75.3433,fp:2},
+ {n:'Amravati',s:'Maharashtra',lat:20.9374,lon:77.7796,fp:2},
+ {n:'Thane',s:'Maharashtra',lat:19.2183,lon:72.9781,fp:4},
+ {n:'Bhavnagar',s:'Gujarat',lat:21.7645,lon:72.1519,fp:4},
+ {n:'Jamnagar',s:'Gujarat',lat:22.4707,lon:70.0577,fp:3},
+ {n:'Gandhinagar',s:'Gujarat',lat:23.2156,lon:72.6369,fp:3},
+ {n:'Jalandhar',s:'Punjab',lat:31.3260,lon:75.5762,fp:4},
+ {n:'Patiala',s:'Punjab',lat:30.3398,lon:76.3869,fp:3},
+ {n:'Udaipur',s:'Rajasthan',lat:24.5854,lon:73.7125,fp:2},
+ {n:'Bikaner',s:'Rajasthan',lat:28.0229,lon:73.3119,fp:1},
+ {n:'Ajmer',s:'Rajasthan',lat:26.4499,lon:74.6399,fp:2},
+ {n:'Rishikesh',s:'Uttarakhand',lat:30.0869,lon:78.2676,fp:2},
+ {n:'Puducherry',s:'Puducherry',lat:11.9416,lon:79.8083,fp:4},
+ {n:'Kanyakumari',s:'Tamil Nadu',lat:8.0883,lon:77.5385,fp:3},
+ {n:'Nagercoil',s:'Tamil Nadu',lat:8.1780,lon:77.4341,fp:3},
+ {n:'Rameswaram',s:'Tamil Nadu',lat:9.2876,lon:79.3129,fp:3},
+ {n:'Port Blair',s:'Andaman & Nicobar',lat:11.6234,lon:92.7265,fp:4},
+ {n:'Daman',s:'Daman & Diu',lat:20.3974,lon:72.8328,fp:4},
+ {n:'Kavaratti',s:'Lakshadweep',lat:10.5593,lon:72.6358,fp:3},
+];
+
+const WORLD = [
+ /* — Africa — */
+ {n:'Algiers',s:'Algeria',lat:36.75,lon:3.06,fp:2},
+ {n:'Luanda',s:'Angola',lat:-8.84,lon:13.23,fp:3},
+ {n:'Porto-Novo',s:'Benin',lat:6.50,lon:2.60,fp:4},
+ {n:'Gaborone',s:'Botswana',lat:-24.63,lon:25.92,fp:1},
+ {n:'Ouagadougou',s:'Burkina Faso',lat:12.37,lon:-1.52,fp:3},
+ {n:'Gitega',s:'Burundi',lat:-3.43,lon:29.93,fp:3},
+ {n:'Praia',s:'Cabo Verde',lat:14.93,lon:-23.51,fp:1},
+ {n:'Yaoundé',s:'Cameroon',lat:3.87,lon:11.52,fp:3},
+ {n:'Bangui',s:'Central African Republic',lat:4.39,lon:18.56,fp:4},
+ {n:"N'Djamena",s:'Chad',lat:12.13,lon:15.06,fp:3},
+ {n:'Moroni',s:'Comoros',lat:-11.70,lon:43.26,fp:3},
+ {n:'Kinshasa',s:'DR Congo',lat:-4.44,lon:15.27,fp:4},
+ {n:'Brazzaville',s:'Congo',lat:-4.26,lon:15.24,fp:4},
+ {n:'Yamoussoukro',s:'Ivory Coast',lat:6.83,lon:-5.29,fp:4},
+ {n:'Djibouti',s:'Djibouti',lat:11.59,lon:43.15,fp:2},
+ {n:'Cairo',s:'Egypt',lat:30.04,lon:31.24,fp:2},
+ {n:'Malabo',s:'Equatorial Guinea',lat:3.75,lon:8.78,fp:4},
+ {n:'Asmara',s:'Eritrea',lat:15.34,lon:38.93,fp:2},
+ {n:'Mbabane',s:'Eswatini',lat:-26.31,lon:31.14,fp:2},
+ {n:'Addis Ababa',s:'Ethiopia',lat:9.03,lon:38.74,fp:2},
+ {n:'Libreville',s:'Gabon',lat:0.39,lon:9.45,fp:4},
+ {n:'Banjul',s:'Gambia',lat:13.45,lon:-16.58,fp:4},
+ {n:'Accra',s:'Ghana',lat:5.60,lon:-0.19,fp:3},
+ {n:'Conakry',s:'Guinea',lat:9.64,lon:-13.58,fp:5},
+ {n:'Bissau',s:'Guinea-Bissau',lat:11.86,lon:-15.60,fp:4},
+ {n:'Nairobi',s:'Kenya',lat:-1.29,lon:36.82,fp:2},
+ {n:'Maseru',s:'Lesotho',lat:-29.31,lon:27.48,fp:2},
+ {n:'Monrovia',s:'Liberia',lat:6.31,lon:-10.80,fp:5},
+ {n:'Tripoli',s:'Libya',lat:32.89,lon:13.19,fp:1},
+ {n:'Antananarivo',s:'Madagascar',lat:-18.88,lon:47.51,fp:2},
+ {n:'Lilongwe',s:'Malawi',lat:-13.96,lon:33.77,fp:2},
+ {n:'Bamako',s:'Mali',lat:12.64,lon:-8.00,fp:3},
+ {n:'Nouakchott',s:'Mauritania',lat:18.08,lon:-15.98,fp:2},
+ {n:'Port Louis',s:'Mauritius',lat:-20.16,lon:57.50,fp:4},
+ {n:'Rabat',s:'Morocco',lat:34.02,lon:-6.84,fp:2},
+ {n:'Maputo',s:'Mozambique',lat:-25.97,lon:32.57,fp:4},
+ {n:'Windhoek',s:'Namibia',lat:-22.56,lon:17.08,fp:1},
+ {n:'Niamey',s:'Niger',lat:13.51,lon:2.11,fp:3},
+ {n:'Abuja',s:'Nigeria',lat:9.06,lon:7.50,fp:4},
+ {n:'Lagos',s:'Nigeria',lat:6.52,lon:3.38,fp:4},
+ {n:'Kigali',s:'Rwanda',lat:-1.94,lon:30.06,fp:2},
+ {n:'São Tomé',s:'São Tomé and Príncipe',lat:0.34,lon:6.73,fp:4},
+ {n:'Dakar',s:'Senegal',lat:14.72,lon:-17.47,fp:2},
+ {n:'Victoria',s:'Seychelles',lat:-4.62,lon:55.45,fp:4},
+ {n:'Freetown',s:'Sierra Leone',lat:8.48,lon:-13.23,fp:5},
+ {n:'Mogadishu',s:'Somalia',lat:2.05,lon:45.32,fp:2},
+ {n:'Pretoria',s:'South Africa',lat:-25.75,lon:28.19,fp:2},
+ {n:'Cape Town',s:'South Africa',lat:-33.92,lon:18.42,fp:3},
+ {n:'Juba',s:'South Sudan',lat:4.85,lon:31.58,fp:3},
+ {n:'Khartoum',s:'Sudan',lat:15.50,lon:32.56,fp:2},
+ {n:'Dodoma',s:'Tanzania',lat:-6.16,lon:35.75,fp:2},
+ {n:'Lomé',s:'Togo',lat:6.13,lon:1.22,fp:3},
+ {n:'Tunis',s:'Tunisia',lat:36.81,lon:10.18,fp:2},
+ {n:'Kampala',s:'Uganda',lat:0.35,lon:32.58,fp:3},
+ {n:'Lusaka',s:'Zambia',lat:-15.39,lon:28.32,fp:2},
+ {n:'Harare',s:'Zimbabwe',lat:-17.83,lon:31.05,fp:2},
+ /* — Americas — */
+ {n:'Buenos Aires',s:'Argentina',lat:-34.60,lon:-58.38,fp:4},
+ {n:'Nassau',s:'Bahamas',lat:25.06,lon:-77.34,fp:5},
+ {n:'Bridgetown',s:'Barbados',lat:13.11,lon:-59.60,fp:5},
+ {n:'Belmopan',s:'Belize',lat:17.25,lon:-88.77,fp:4},
+ {n:'La Paz',s:'Bolivia',lat:-16.50,lon:-68.15,fp:2},
+ {n:'Brasília',s:'Brazil',lat:-15.79,lon:-47.88,fp:3},
+ {n:'São Paulo',s:'Brazil',lat:-23.55,lon:-46.63,fp:3},
+ {n:'Rio de Janeiro',s:'Brazil',lat:-22.91,lon:-43.17,fp:4},
+ {n:'Ottawa',s:'Canada',lat:45.42,lon:-75.70,fp:2},
+ {n:'Toronto',s:'Canada',lat:43.65,lon:-79.38,fp:3},
+ {n:'Vancouver',s:'Canada',lat:49.28,lon:-123.12,fp:4},
+ {n:'Montreal',s:'Canada',lat:45.50,lon:-73.57,fp:3},
+ {n:'Santiago',s:'Chile',lat:-33.45,lon:-70.67,fp:2},
+ {n:'Bogotá',s:'Colombia',lat:4.71,lon:-74.07,fp:4},
+ {n:'San José',s:'Costa Rica',lat:9.93,lon:-84.08,fp:4},
+ {n:'Havana',s:'Cuba',lat:23.11,lon:-82.37,fp:4},
+ {n:'Roseau',s:'Dominica',lat:15.30,lon:-61.39,fp:4},
+ {n:'Santo Domingo',s:'Dominican Republic',lat:18.49,lon:-69.93,fp:4},
+ {n:'Quito',s:'Ecuador',lat:-0.18,lon:-78.47,fp:3},
+ {n:'San Salvador',s:'El Salvador',lat:13.69,lon:-89.19,fp:3},
+ {n:'Guatemala City',s:'Guatemala',lat:14.63,lon:-90.51,fp:3},
+ {n:'Georgetown',s:'Guyana',lat:6.80,lon:-58.16,fp:5},
+ {n:'Port-au-Prince',s:'Haiti',lat:18.54,lon:-72.34,fp:4},
+ {n:'Tegucigalpa',s:'Honduras',lat:14.07,lon:-87.19,fp:3},
+ {n:'Kingston',s:'Jamaica',lat:18.02,lon:-76.81,fp:4},
+ {n:'Mexico City',s:'Mexico',lat:19.43,lon:-99.13,fp:3},
+ {n:'Managua',s:'Nicaragua',lat:12.11,lon:-86.24,fp:3},
+ {n:'Panama City',s:'Panama',lat:8.98,lon:-79.52,fp:4},
+ {n:'Asunción',s:'Paraguay',lat:-25.26,lon:-57.58,fp:4},
+ {n:'Lima',s:'Peru',lat:-12.05,lon:-77.04,fp:1},
+ {n:'Basseterre',s:'Saint Kitts and Nevis',lat:17.30,lon:-62.73,fp:4},
+ {n:'Castries',s:'Saint Lucia',lat:14.01,lon:-60.99,fp:4},
+ {n:'Kingstown',s:'St. Vincent & Grenadines',lat:13.16,lon:-61.22,fp:4},
+ {n:'Paramaribo',s:'Suriname',lat:5.85,lon:-55.20,fp:5},
+ {n:'Port of Spain',s:'Trinidad and Tobago',lat:10.66,lon:-61.51,fp:4},
+ {n:'Washington D.C.',s:'United States',lat:38.91,lon:-77.04,fp:3},
+ {n:'New York',s:'United States',lat:40.71,lon:-74.01,fp:3},
+ {n:'Los Angeles',s:'United States',lat:34.05,lon:-118.24,fp:2},
+ {n:'Chicago',s:'United States',lat:41.88,lon:-87.63,fp:3},
+ {n:'Houston',s:'United States',lat:29.76,lon:-95.37,fp:4},
+ {n:'Miami',s:'United States',lat:25.76,lon:-80.19,fp:5},
+ {n:'Seattle',s:'United States',lat:47.61,lon:-122.33,fp:3},
+ {n:'Montevideo',s:'Uruguay',lat:-34.90,lon:-56.16,fp:3},
+ {n:'Caracas',s:'Venezuela',lat:10.48,lon:-66.90,fp:4},
+ /* — Asia & Middle East — */
+ {n:'Kabul',s:'Afghanistan',lat:34.53,lon:69.17,fp:2},
+ {n:'Yerevan',s:'Armenia',lat:40.18,lon:44.51,fp:1},
+ {n:'Baku',s:'Azerbaijan',lat:40.41,lon:49.87,fp:2},
+ {n:'Manama',s:'Bahrain',lat:26.23,lon:50.59,fp:2},
+ {n:'Dhaka',s:'Bangladesh',lat:23.81,lon:90.41,fp:5},
+ {n:'Thimphu',s:'Bhutan',lat:27.47,lon:89.64,fp:2},
+ {n:'Bandar Seri Begawan',s:'Brunei',lat:4.90,lon:114.94,fp:5},
+ {n:'Phnom Penh',s:'Cambodia',lat:11.56,lon:104.92,fp:5},
+ {n:'Beijing',s:'China',lat:39.90,lon:116.41,fp:3},
+ {n:'Shanghai',s:'China',lat:31.23,lon:121.47,fp:4},
+ {n:'Hong Kong',s:'China',lat:22.32,lon:114.17,fp:5},
+ {n:'Nicosia',s:'Cyprus',lat:35.19,lon:33.38,fp:1},
+ {n:'Tbilisi',s:'Georgia',lat:41.72,lon:44.83,fp:2},
+ {n:'Jakarta',s:'Indonesia',lat:-6.21,lon:106.85,fp:5},
+ {n:'Tehran',s:'Iran',lat:35.69,lon:51.39,fp:2},
+ {n:'Baghdad',s:'Iraq',lat:33.31,lon:44.37,fp:2},
+ {n:'Jerusalem',s:'Israel',lat:31.77,lon:35.21,fp:1},
+ {n:'Tokyo',s:'Japan',lat:35.68,lon:139.69,fp:3},
+ {n:'Osaka',s:'Japan',lat:34.69,lon:135.50,fp:4},
+ {n:'Amman',s:'Jordan',lat:31.95,lon:35.93,fp:1},
+ {n:'Astana',s:'Kazakhstan',lat:51.17,lon:71.43,fp:2},
+ {n:'Kuwait City',s:'Kuwait',lat:29.38,lon:47.99,fp:1},
+ {n:'Bishkek',s:'Kyrgyzstan',lat:42.87,lon:74.59,fp:2},
+ {n:'Vientiane',s:'Laos',lat:17.97,lon:102.60,fp:5},
+ {n:'Beirut',s:'Lebanon',lat:33.89,lon:35.50,fp:2},
+ {n:'Kuala Lumpur',s:'Malaysia',lat:3.14,lon:101.69,fp:5},
+ {n:'Malé',s:'Maldives',lat:4.18,lon:73.51,fp:5},
+ {n:'Ulaanbaatar',s:'Mongolia',lat:47.89,lon:106.91,fp:1},
+ {n:'Naypyidaw',s:'Myanmar',lat:19.76,lon:96.08,fp:4},
+ {n:'Yangon',s:'Myanmar',lat:16.87,lon:96.20,fp:5},
+ {n:'Kathmandu',s:'Nepal',lat:27.72,lon:85.32,fp:4},
+ {n:'Pyongyang',s:'North Korea',lat:39.04,lon:125.76,fp:3},
+ {n:'Muscat',s:'Oman',lat:23.59,lon:58.41,fp:1},
+ {n:'Islamabad',s:'Pakistan',lat:33.68,lon:73.05,fp:3},
+ {n:'Karachi',s:'Pakistan',lat:24.86,lon:67.01,fp:4},
+ {n:'Ramallah',s:'Palestine',lat:31.90,lon:35.20,fp:1},
+ {n:'Manila',s:'Philippines',lat:14.60,lon:120.98,fp:5},
+ {n:'Doha',s:'Qatar',lat:25.29,lon:51.53,fp:1},
+ {n:'Riyadh',s:'Saudi Arabia',lat:24.71,lon:46.68,fp:1},
+ {n:'Singapore',s:'Singapore',lat:1.35,lon:103.82,fp:5},
+ {n:'Seoul',s:'South Korea',lat:37.57,lon:126.98,fp:3},
+ {n:'Busan',s:'South Korea',lat:35.18,lon:129.08,fp:3},
+ {n:'Colombo',s:'Sri Lanka',lat:6.93,lon:79.85,fp:5},
+ {n:'Damascus',s:'Syria',lat:33.51,lon:36.29,fp:1},
+ {n:'Taipei',s:'Taiwan',lat:25.03,lon:121.57,fp:4},
+ {n:'Dushanbe',s:'Tajikistan',lat:38.56,lon:68.78,fp:2},
+ {n:'Bangkok',s:'Thailand',lat:13.76,lon:100.50,fp:5},
+ {n:'Dili',s:'Timor-Leste',lat:-8.56,lon:125.57,fp:4},
+ {n:'Ankara',s:'Turkey',lat:39.93,lon:32.86,fp:2},
+ {n:'Istanbul',s:'Turkey',lat:41.01,lon:28.98,fp:3},
+ {n:'Ashgabat',s:'Turkmenistan',lat:37.95,lon:58.38,fp:1},
+ {n:'Abu Dhabi',s:'United Arab Emirates',lat:24.45,lon:54.38,fp:1},
+ {n:'Dubai',s:'United Arab Emirates',lat:25.20,lon:55.27,fp:1},
+ {n:'Tashkent',s:'Uzbekistan',lat:41.30,lon:69.24,fp:2},
+ {n:'Hanoi',s:'Vietnam',lat:21.03,lon:105.85,fp:5},
+ {n:'Ho Chi Minh City',s:'Vietnam',lat:10.82,lon:106.63,fp:5},
+ {n:"Sana'a",s:'Yemen',lat:15.37,lon:44.19,fp:1},
+ /* — Europe — */
+ {n:'Tirana',s:'Albania',lat:41.33,lon:19.82,fp:3},
+ {n:'Andorra la Vella',s:'Andorra',lat:42.51,lon:1.52,fp:2},
+ {n:'Vienna',s:'Austria',lat:48.21,lon:16.37,fp:3},
+ {n:'Minsk',s:'Belarus',lat:53.90,lon:27.57,fp:2},
+ {n:'Brussels',s:'Belgium',lat:50.85,lon:4.35,fp:3},
+ {n:'Sarajevo',s:'Bosnia and Herzegovina',lat:43.86,lon:18.41,fp:3},
+ {n:'Sofia',s:'Bulgaria',lat:42.70,lon:23.32,fp:2},
+ {n:'Zagreb',s:'Croatia',lat:45.81,lon:15.98,fp:2},
+ {n:'Prague',s:'Czechia',lat:50.08,lon:14.44,fp:2},
+ {n:'Copenhagen',s:'Denmark',lat:55.68,lon:12.57,fp:2},
+ {n:'Tallinn',s:'Estonia',lat:59.44,lon:24.75,fp:2},
+ {n:'Helsinki',s:'Finland',lat:60.17,lon:24.94,fp:2},
+ {n:'Paris',s:'France',lat:48.86,lon:2.35,fp:3},
+ {n:'Berlin',s:'Germany',lat:52.52,lon:13.40,fp:2},
+ {n:'Frankfurt',s:'Germany',lat:50.11,lon:8.68,fp:3},
+ {n:'Athens',s:'Greece',lat:37.98,lon:23.73,fp:2},
+ {n:'Budapest',s:'Hungary',lat:47.50,lon:19.04,fp:3},
+ {n:'Reykjavík',s:'Iceland',lat:64.15,lon:-21.94,fp:2},
+ {n:'Dublin',s:'Ireland',lat:53.35,lon:-6.26,fp:3},
+ {n:'Rome',s:'Italy',lat:41.90,lon:12.50,fp:3},
+ {n:'Milan',s:'Italy',lat:45.46,lon:9.19,fp:3},
+ {n:'Pristina',s:'Kosovo',lat:42.66,lon:21.17,fp:2},
+ {n:'Riga',s:'Latvia',lat:56.95,lon:24.11,fp:2},
+ {n:'Vaduz',s:'Liechtenstein',lat:47.14,lon:9.52,fp:2},
+ {n:'Vilnius',s:'Lithuania',lat:54.69,lon:25.28,fp:2},
+ {n:'Luxembourg',s:'Luxembourg',lat:49.61,lon:6.13,fp:2},
+ {n:'Valletta',s:'Malta',lat:35.90,lon:14.51,fp:2},
+ {n:'Chișinău',s:'Moldova',lat:47.01,lon:28.86,fp:2},
+ {n:'Monaco',s:'Monaco',lat:43.74,lon:7.42,fp:3},
+ {n:'Podgorica',s:'Montenegro',lat:42.44,lon:19.26,fp:3},
+ {n:'Amsterdam',s:'Netherlands',lat:52.37,lon:4.90,fp:4},
+ {n:'Rotterdam',s:'Netherlands',lat:51.92,lon:4.48,fp:4},
+ {n:'Skopje',s:'North Macedonia',lat:42.00,lon:21.43,fp:2},
+ {n:'Oslo',s:'Norway',lat:59.91,lon:10.75,fp:2},
+ {n:'Warsaw',s:'Poland',lat:52.23,lon:21.01,fp:2},
+ {n:'Lisbon',s:'Portugal',lat:38.72,lon:-9.14,fp:2},
+ {n:'Bucharest',s:'Romania',lat:44.43,lon:26.10,fp:2},
+ {n:'Moscow',s:'Russia',lat:55.76,lon:37.62,fp:2},
+ {n:'San Marino',s:'San Marino',lat:43.94,lon:12.45,fp:2},
+ {n:'Belgrade',s:'Serbia',lat:44.79,lon:20.45,fp:2},
+ {n:'Bratislava',s:'Slovakia',lat:48.15,lon:17.11,fp:3},
+ {n:'Ljubljana',s:'Slovenia',lat:46.05,lon:14.51,fp:3},
+ {n:'Madrid',s:'Spain',lat:40.42,lon:-3.70,fp:2},
+ {n:'Barcelona',s:'Spain',lat:41.39,lon:2.17,fp:3},
+ {n:'Stockholm',s:'Sweden',lat:59.33,lon:18.07,fp:2},
+ {n:'Bern',s:'Switzerland',lat:46.95,lon:7.45,fp:3},
+ {n:'Geneva',s:'Switzerland',lat:46.20,lon:6.14,fp:2},
+ {n:'Kyiv',s:'Ukraine',lat:50.45,lon:30.52,fp:2},
+ {n:'London',s:'United Kingdom',lat:51.51,lon:-0.13,fp:3},
+ {n:'Manchester',s:'United Kingdom',lat:53.48,lon:-2.24,fp:3},
+ {n:'Vatican City',s:'Vatican City',lat:41.90,lon:12.45,fp:2},
+ /* — Oceania — */
+ {n:'Canberra',s:'Australia',lat:-35.28,lon:149.13,fp:2},
+ {n:'Sydney',s:'Australia',lat:-33.87,lon:151.21,fp:3},
+ {n:'Melbourne',s:'Australia',lat:-37.81,lon:144.96,fp:2},
+ {n:'Brisbane',s:'Australia',lat:-27.47,lon:153.03,fp:4},
+ {n:'Suva',s:'Fiji',lat:-18.14,lon:178.44,fp:4},
+ {n:'South Tarawa',s:'Kiribati',lat:1.33,lon:172.98,fp:4},
+ {n:'Majuro',s:'Marshall Islands',lat:7.09,lon:171.38,fp:4},
+ {n:'Palikir',s:'Micronesia',lat:6.92,lon:158.16,fp:4},
+ {n:'Yaren',s:'Nauru',lat:-0.55,lon:166.93,fp:3},
+ {n:'Wellington',s:'New Zealand',lat:-41.29,lon:174.78,fp:3},
+ {n:'Auckland',s:'New Zealand',lat:-36.85,lon:174.76,fp:3},
+ {n:'Ngerulmud',s:'Palau',lat:7.50,lon:134.62,fp:4},
+ {n:'Port Moresby',s:'Papua New Guinea',lat:-9.44,lon:147.18,fp:5},
+ {n:'Apia',s:'Samoa',lat:-13.83,lon:-171.77,fp:4},
+ {n:'Honiara',s:'Solomon Islands',lat:-9.43,lon:159.95,fp:5},
+ {n:'Nukuʻalofa',s:'Tonga',lat:-21.13,lon:-175.20,fp:4},
+ {n:'Funafuti',s:'Tuvalu',lat:-8.52,lon:179.19,fp:4},
+ {n:'Port Vila',s:'Vanuatu',lat:-17.73,lon:168.32,fp:4},
+];
+
+const ALL = CITIES.concat(WORLD);
+
+const DEFAULT_CITY = CITIES.find(c=>c.n==='Bhubaneswar') || CITIES[0];
+
+/* ---------- model configuration (editable) ---------- */
+const MODEL = {
+  weights: { intensity:35, accumulation24:30, forecast48:20, storm:5, baseline:10 },
+  // saturation scales (value that earns full marks)
+  intensityMax: 20,    // mm/h
+  accumMax: 100,       // mm in 24h
+  forecastMax: 150,    // mm in 48h
+  // IMD-inspired rainfall thresholds
+  heavyRate: 7.6,      // mm/h (IMD "heavy rain")
+  heavy24: 64.5,       // mm/day (IMD "heavy")
+  veryHeavy24: 115.6,  // mm/day (IMD "very heavy")
+  highAccum48: 115,    // mm in 48h
+};
+
+/* ---------- helpers ---------- */
+const $ = (id)=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const r1=(v)=>Math.round(v*10)/10;
+function hashStr(s){let h=7;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+function stormScore(code){
+  if(code>=95) return 5;               // thunderstorm
+  if(code>=80) return 3.5;             // showers
+  if(code>=61) return 2;               // rain
+  if(code>=51) return 1;               // drizzle
+  return 0;
+}
+function weatherText(code){
+  if(code===0) return 'Clear sky';
+  if(code<=2) return 'Partly cloudy';
+  if(code===3) return 'Overcast';
+  if(code<=48) return 'Fog';
+  if(code<=57) return 'Drizzle';
+  if(code<=67) return 'Rain';
+  if(code<=77) return 'Snow';
+  if(code<=82) return 'Rain showers';
+  if(code<=86) return 'Snow showers';
+  if(code===95) return 'Thunderstorm';
+  return 'Thunderstorm w/ hail';
+}
+function levelFor(score){
+  if(score>=85) return {label:'Extreme', color:'#f43f5e'};
+  if(score>=70) return {label:'Critical', color:'#f87171'};
+  if(score>=50) return {label:'High', color:'#fb923c'};
+  if(score>=30) return {label:'Elevated', color:'#fbbf24'};
+  return {label:'Low', color:'#34d399'};
+}
+
+/* ---------- risk model ---------- */
+function computeRisk(forecast, profile){
+  const cur = forecast.current || {};
+  const hourly = forecast.hourly || {};
+  const hp = hourly.precipitation || [];
+  const times = hourly.time || [];
+  const currentRate = (cur.precipitation ?? 0);
+  const weatherCode = cur.weather_code ?? 0;
+
+  // locate current hour index
+  let idx = -1;
+  if(cur.time && times.length){
+    const curH = String(cur.time).slice(0,13);
+    idx = times.findIndex(t=>String(t).slice(0,13)===curH);
+  }
+  if(idx<0) idx = Math.max(0, Math.min(times.length-1, Math.floor(times.length*0.25)));
+
+  const last24 = hp.slice(Math.max(0,idx-23), idx+1).reduce((a,b)=>a+(b||0),0);
+  const next24Arr = hp.slice(idx+1, idx+25);
+  const next48 = hp.slice(idx+1, idx+49).reduce((a,b)=>a+(b||0),0);
+
+  const daily = forecast.daily || {};
+  const dSum = daily.precipitation_sum || [];
+
+  // factor contributions
+  const w = MODEL.weights;
+  const fIntensity = clamp(currentRate/MODEL.intensityMax,0,1) * w.intensity;
+  const fAccum    = clamp(last24/MODEL.accumMax,0,1) * w.accumulation24;
+  const fForecast = clamp(next48/MODEL.forecastMax,0,1) * w.forecast48;
+  const fStorm    = clamp(stormScore(weatherCode)/5,0,1) * w.storm;
+  const fBase     = (profile.fp/5) * w.baseline;
+
+  const risk = clamp(r1(fIntensity+fAccum+fForecast+fStorm+fBase), 0, 100);
+
+  // zones
+  const zoneTpl = [
+    {name:'Low-lying wards', w:1.15},
+    {name:'River corridor',  w:1.25},
+    {name:'Old town core',   w:1.05},
+    {name:'Suburban periphery', w:0.85},
+    {name:'Industrial belt', w:0.95},
+    {name:'Hillside settlements', w:0.75},
+  ];
+  const h = hashStr(profile.n || profile.name);
+  const zones = zoneTpl.map((z,i)=>{
+    const jitter = ((h >> (i*3)) % 7) - 3;
+    const zr = clamp(Math.round(risk*z.w + jitter), 0, 100);
+    return {name:z.name, risk:zr, level:levelFor(zr)};
+  }).sort((a,b)=>b.risk-a.risk);
+
+  // alerts
+  const alerts = [];
+  const push=(level,title,desc)=>{alerts.push({level,title,desc,status:'active',lifecycle:['detected','triaged','active']});};
+  if(risk>=70) push('critical','Critical flood risk',`Overall risk is ${risk}% — take immediate precautions.`);
+  else if(risk>=50) push('warning','Elevated flood risk',`Overall risk is ${risk}% — monitor conditions closely.`);
+  else if(risk>=30) push('watch','Moderate flood risk',`Overall risk is ${risk}% — stay informed.`);
+  if(currentRate>=MODEL.heavyRate) push('critical','Heavy rainfall in progress',`Current rate ${r1(currentRate)} mm/h exceeds the IMD 'heavy rain' threshold (${MODEL.heavyRate} mm/h).`);
+  if(last24>=MODEL.veryHeavy24) push('critical','Very heavy 24-h rainfall',`${r1(last24)} mm in the last 24 hours (IMD 'very heavy').`);
+  else if(last24>=MODEL.heavy24) push('warning','Heavy 24-h rainfall',`${r1(last24)} mm in the last 24 hours (IMD 'heavy').`);
+  if(next48>=MODEL.highAccum48) push('critical','High rainfall accumulation expected',`${r1(next48)} mm forecast over the next 48 hours.`);
+  if(weatherCode>=95) push('warning','Thunderstorm activity',`${weatherText(weatherCode)} reported at the station.`);
+  if(alerts.length===0) alerts.push({level:'ok',title:'No active alerts',desc:'Conditions are normal for now.',status:'clear',lifecycle:['monitored']});
+
+  return {
+    risk, currentRate, last24, next48, next24Arr, weatherCode,
+    factors:[
+      {name:'Rainfall intensity', raw:`${r1(currentRate)} mm/h`, weight:`${w.intensity}`, contrib:r1(fIntensity)},
+      {name:'24-h accumulation',  raw:`${r1(last24)} mm`,   weight:`${w.accumulation24}`, contrib:r1(fAccum)},
+      {name:'48-h forecast',      raw:`${r1(next48)} mm`,   weight:`${w.forecast48}`, contrib:r1(fForecast)},
+      {name:'Storm severity',     raw:weatherText(weatherCode), weight:`${w.storm}`, contrib:r1(fStorm)},
+      {name:'City proneness',     raw:`${profile.fp}/5`,    weight:`${w.baseline}`, contrib:r1(fBase)},
+    ],
+    zones, alerts,
+    daily: (dSum||[]).slice(0,7),
+    dailyTimes: (daily.time||[]).slice(0,7),
+  };
+}
+
+/* ---------- data fetching ---------- */
+async function fetchWeather(lat, lon){
+  // 1) same-origin proxy (works in live preview)
+  try{
+    const r = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+    if(r.ok){ const d = await r.json(); if(d.error) throw new Error(d.error); return d; }
+  }catch(e){ /* fall through */ }
+  // 2) direct Open-Meteo (works when the file is opened in a normal browser)
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast'
+      + `?latitude=${lat}&longitude=${lon}`
+      + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_gusts_10m,surface_pressure'
+      + '&hourly=precipitation,precipitation_probability,weather_code'
+      + '&daily=precipitation_sum,precipitation_probability_max,weather_code'
+      + '&timezone=auto&past_days=1&forecast_days=7';
+    const r = await fetch(url);
+    if(r.ok) return await r.json();
+  }catch(e){ /* fall through */ }
+  // 3) offline demo fallback
+  return DEMO_DATA;
+}
+
+async function geocode(q){
+  try{
+    const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+    if(r.ok){ const d = await r.json(); if(d.results) return d.results; }
+  }catch(e){}
+  try{
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(q)+'&count=10&language=en&format=json');
+    if(r.ok){ const d = await r.json(); return (d.results||[]).slice(0,10).map(x=>({name:x.name,state:x.admin1||'',country:x.country||x.country_code||'',latitude:x.latitude,longitude:x.longitude,elevation:x.elevation!=null?Math.round(x.elevation):null,population:x.population||null})); }
+  }catch(e){}
+  return [];
+}
+
+/* offline demo fallback (Bhubaneswar-like) */
+const DEMO_DATA = {
+  timezone:'Asia/Kolkata',
+  current:{time:new Date().toISOString().slice(0,13)+':00',precipitation:0.9,rain:0,showers:0,weather_code:95,temperature_2m:26.4,relative_humidity_2m:84,apparent_temperature:29.1,wind_speed_10m:17.2,wind_gusts_10m:34.2,surface_pressure:1002.1},
+  hourly:{time:Array.from({length:72},(_,i)=>new Date(Date.now()-(24-i)*3600e3).toISOString().slice(0,13)+':00'), precipitation:[0,0,0,0,0.1,0,0,0,0.2,0,0,0,0,0,0,0,0.3,0,0,0,0.5,0,0,0,0.9,1.4,2.2,0.8,0.4,0.2,0,0,0.2,0.6,1.1,0.7,0.3,0,0,0,0.1,0.4,0.8,0.6,0.2,0,0,0,0,0.1,0.3,0.7,0.5,0.2,0,0,0,0,0.1,0.2,0.5,0.8,0.4,0.1,0,0,0,0,0,0,0,0,0,0],weather_code:Array.from({length:72},(_,i)=>i>=24&&i<30?95:61)},
+  daily:{time:Array.from({length:7},(_,i)=>new Date(Date.now()+i*86400e3).toISOString().slice(0,10)), precipitation_sum:[18.4,32.1,45.7,12.3,6.1,2.2,1.0]},
+};
+DEMO_DATA._demo = true;
+
+/* ---------- state & rendering ---------- */
+let state = { city: null, weather: null, model: null, geoCities: [] };
+
+const cityProfile = (c)=>{
+  const key = String(c.name||c.n||'').toLowerCase();
+  const curated = CITIES.find(x=>x.n.toLowerCase()===key) || WORLD.find(x=>x.n.toLowerCase()===key);
+  let state = c.state || c.s || '';
+  const country = c.country || '';
+  if (country && state && country.toLowerCase() !== state.toLowerCase()) state = `${state}, ${country}`;
+  else if (country && !state) state = country;
+  return { name: c.name || c.n, state, lat: c.latitude ?? c.lat, lon: c.longitude ?? c.lon, fp: curated ? curated.fp : (c.fp ?? 3), elevation: c.elevation ?? null };
+};
+
+function renderCityBanner(p, w){
+  const meta = [];
+  if(p.state) meta.push(`📍 ${p.state}`);
+  meta.push(`🧭 ${r1(p.lat)}°, ${r1(p.lon)}°`);
+  if(p.elevation!=null) meta.push(`⛰ ${p.elevation} m elevation`);
+  if(w && w._demo) meta.push('⚠ demo data (offline)');
+  $('cityName').textContent = p.name;
+  $('cityMeta').innerHTML = meta.map(m=>`<span>${m}</span>`).join('');
+}
+
+function sparkSVG(arr){
+  const max = Math.max(1,...arr);
+  return arr.map(v=>`<i style="height:${Math.max(4,Math.round((v/max)*100))}%"></i>`).join('');
+}
+
+function render(){
+  const p = state.city, w = state.weather;
+  if(!w){ $('dashBody').innerHTML = '<div class="loading"><span class="spinner"></span> Fetching live weather…</div>'; return; }
+  const m = computeRisk(w, p);
+  state.model = m;
+
+  const lvl = levelFor(m.risk);
+  const gaugeC = 2*Math.PI*84;
+  const off = gaugeC*(1-m.risk/100);
+  const temp = w.current?.temperature_2m ?? null;
+  const hum = w.current?.relative_humidity_2m ?? null;
+  const wind = w.current?.wind_speed_10m ?? null;
+  const press = w.current?.surface_pressure ?? null;
+
+  const alertCards = m.alerts.map(a=>{
+    const c = a.level==='critical'?'#f43f5e':a.level==='warning'?'#fb923c':a.level==='watch'?'#fbbf24':'#34d399';
+    const icon = a.level==='ok'
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+    const steps = a.lifecycle.map((s,i)=>{const done=i<a.lifecycle.length-1; return `<i class="${done?'':'pending'}"></i> ${s}`;}).join(' <span class="muted">→</span> ');
+    return `<div class="alert" style="border-left-color:${c}">
+      <div class="icon" style="background:${c}1f">${icon}</div>
+      <div style="flex:1">
+        <div class="t">${a.title} <span class="status" style="color:${c};background:${c}1a">${a.status}</span></div>
+        <div class="d">${a.desc}</div>
+        <div class="life">lifecycle: ${steps}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const zoneRows = m.zones.map(z=>{
+    const c = z.level.color;
+    return `<div class="bar-row">
+      <span class="zone-name">${z.name}</span>
+      <span class="zone-val" style="color:${c}">${z.risk}% <span class="chip" style="color:${c};border-color:${c}55;background:${c}14">${z.level.label}</span></span>
+      <div class="bar-track"><div class="bar-fill" style="width:${z.risk}%;background:linear-gradient(90deg,${c}88,${c})"></div></div>
+    </div>`;
+  }).join('');
+
+  const factorRows = m.factors.map(f=>`<tr><td>${f.name}</td><td class="weight">${f.raw}</td><td class="weight">/${f.weight}</td><td>${f.contrib}</td></tr>`).join('');
+
+  const days = (m.dailyTimes||[]).map((t,i)=>{
+    const d = new Date(t+'T00:00:00');
+    const wd = d.toLocaleDateString('en-IN',{weekday:'short'});
+    const dd = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    const mm = m.daily[i] ?? 0;
+    return `<div class="day ${i===0?'today':''}">
+      <div class="dn">${i===0?'Today':wd}</div>
+      <div class="dd">${dd}</div>
+      <div class="dp" style="color:${mm>=64.5?'#f87171':mm>=15?'#fbbf24':'#34d399'}">${r1(mm)}<small style="font-size:10px;color:var(--muted2)"> mm</small></div>
+    </div>`;
+  }).join('');
+
+  $('dashBody').innerHTML = `
+  <div class="metrics">
+    <div class="card gauge-card">
+      <div class="k">Overall risk</div>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="170" height="170" viewBox="0 0 170 170">
+            <defs>
+              <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="${lvl.color}"/>
+              </linearGradient>
+            </defs>
+            <circle cx="85" cy="85" r="84" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="12"/>
+            <circle cx="85" cy="85" r="84" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round"
+              stroke-dasharray="${gaugeC}" stroke-dashoffset="${off}"
+              style="transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/>
+          </svg>
+          <div class="num"><div><b style="color:${lvl.color}">${m.risk}%</b><br><span>risk</span></div></div>
+        </div>
+      </div>
+      <div style="text-align:center">
+        <span class="risk-label" style="color:${lvl.color};border-color:${lvl.color}55;background:${lvl.color}14">${lvl.label} risk</span>
+        <div class="risk-note">Computed from live rainfall intensity, 24-h accumulation, 48-h forecast, storm severity &amp; city proneness.</div>
+      </div>
+    </div>
+
+    <div class="card stats-card">
+      <div class="k">Now · ${weatherText(m.weatherCode)}</div>
+      <div class="stats-grid">
+        <div class="stat"><div class="lbl">Rainfall (now)</div><div class="v">${r1(m.currentRate)} <small>mm/h</small></div></div>
+        <div class="stat"><div class="lbl">Last 24 h</div><div class="v">${r1(m.last24)} <small>mm</small></div></div>
+        <div class="stat"><div class="lbl">Next 48 h</div><div class="v">${r1(m.next48)} <small>mm</small></div></div>
+        <div class="stat"><div class="lbl">Active alerts</div><div class="v" style="color:${m.alerts[0]&&m.alerts[0].level==='ok'?'#34d399':'#f87171'}">${m.alerts[0]&&m.alerts[0].level==='ok'?0:m.alerts.length} <small>active</small></div></div>
+        <div class="stat"><div class="lbl">Temperature</div><div class="v">${temp!=null?r1(temp):'—'} <small>°C</small></div></div>
+        <div class="stat"><div class="lbl">Wind / Humidity</div><div class="v" style="font-size:20px">${wind!=null?r1(wind):'—'}<small> km/h</small> · ${hum!=null?Math.round(hum):'—'}<small>%</small></div></div>
+      </div>
+      <div class="k" style="margin-top:16px">Rainfall — next 24 h <span class="weight muted">(mm/h)</span></div>
+      <div class="spark">${sparkSVG(m.next24Arr)}</div>
+      <div class="spark-lbl"><span>+1 h</span><span>+12 h</span><span>+24 h</span></div>
+    </div>
+  </div>
+
+  <div class="panel-row">
+    <div class="card">
+      <div class="k">Zone risk breakdown</div>
+      <div class="bars">${zoneRows}</div>
+    </div>
+    <div class="card">
+      <div class="k">Alerts · lifecycle</div>
+      <div class="alerts">${alertCards}</div>
+    </div>
+  </div>
+
+  <div class="panel-row">
+    <div class="card">
+      <div class="k">Score factors · traceable</div>
+      <table class="factors">
+        <thead><tr><th>Factor</th><th>Observed</th><th>Weight</th><th>Points</th></tr></thead>
+        <tbody>${factorRows}</tbody>
+        <tfoot><tr><td style="font-weight:700">Overall risk</td><td></td><td>/100</td><td style="font-weight:700;color:${lvl.color}">${m.risk}</td></tr></tfoot>
+      </table>
+      <div class="muted" style="font-size:12px;margin-top:10px">Thresholds follow IMD rainfall categories; weights are configurable in the model.</div>
+    </div>
+    <div class="card">
+      <div class="k">7-day rainfall outlook</div>
+      <div class="dailies">${days}</div>
+    </div>
+  </div>`;
+
+  // updated timestamp
+  const t = w.current && w.current.time ? w.current.time.replace('T',' ') : '';
+  $('updatedAt').textContent = t ? `updated ${t}` : '—';
+}
+
+async function loadCity(city){
+  const p = cityProfile(city);
+  state.city = p;
+  try{ localStorage.setItem('floodsight_city', JSON.stringify({name:p.name,state:p.state,lat:p.lat,lon:p.lon,fp:p.fp,elevation:p.elevation})); }catch(e){}
+  $('cityInput').value = p.name + (p.state?` — ${p.state}`:'');
+  closeSuggest();
+  $('dashBody').innerHTML = '<div class="loading"><span class="spinner"></span> Fetching live weather for '+p.name+'…</div>';
+  renderCityBanner(p, null);
+  const w = await fetchWeather(p.lat, p.lon);
+  state.weather = w;
+  renderCityBanner(p, w);
+  render();
+}
+
+/* ---------- city picker UI ---------- */
+const input = $('cityInput'), suggest = $('suggest');
+function closeSuggest(){ suggest.classList.remove('open'); }
+function openSuggest(){ suggest.classList.add('open'); }
+
+function renderSuggest(){
+  const q = input.value.trim().toLowerCase();
+  const ind = q ? CITIES.filter(c=>c.n.toLowerCase().includes(q) || c.s.toLowerCase().includes(q)).slice(0,8) : CITIES.slice(0,8);
+  const world = q ? WORLD.filter(c=>c.n.toLowerCase().includes(q) || c.s.toLowerCase().includes(q)).slice(0,10) : WORLD.slice(0,10);
+  let html = '';
+  if(ind.length){ html += '<div class="item hd">🇮🇳 India</div>' + ind.map(c=>`<div class="item" data-i="${CITIES.indexOf(c)}"><span>${c.n}</span><span class="st">${c.s}</span></div>`).join(''); }
+  if(world.length){ html += '<div class="item hd">🌍 World</div>' + world.map(c=>`<div class="item" data-w="${WORLD.indexOf(c)}"><span>${c.n}</span><span class="st">${c.s}</span></div>`).join(''); }
+  if(q) html += `<div class="item searchonline" data-search="1">🔍 Search online for “${input.value.trim()}”</div>`;
+  if(state.geoCities.length){
+    html += '<div class="item hd">Online results</div>';
+    html += state.geoCities.map((g,i)=>`<div class="item" data-g="${i}"><span>${g.name}</span><span class="st">${g.state||g.country||''}</span></div>`).join('');
+  }
+  suggest.innerHTML = html || '<div class="item hd">No matches</div>';
+  openSuggest();
+}
+
+input.addEventListener('input', ()=>{ state.geoCities = []; renderSuggest(); });
+input.addEventListener('focus', ()=>{ if(!suggest.classList.contains('open')) renderSuggest(); });
+input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); runOnlineSearch(); } });
+document.addEventListener('click', (e)=>{ if(!e.target.closest('.picker')) closeSuggest(); });
+
+suggest.addEventListener('click', async (e)=>{
+  const el = e.target.closest('.item'); if(!el) return;
+  if(el.dataset.search){ await runOnlineSearch(); return; }
+  if(el.dataset.i != null){ await loadCity(CITIES[+el.dataset.i]); return; }
+  if(el.dataset.w != null){ await loadCity(WORLD[+el.dataset.w]); return; }
+  if(el.dataset.g != null){ await loadCity(state.geoCities[+el.dataset.g]); return; }
+});
+
+async function runOnlineSearch(){
+  const q = input.value.trim(); if(q.length<2) return;
+  suggest.innerHTML = '<div class="item hd">Searching Open-Meteo…</div>'; openSuggest();
+  const res = await geocode(q);
+  state.geoCities = res.slice(0,8);
+  renderSuggest();
+}
+
+$('geoBtn').addEventListener('click', runOnlineSearch);
+$('refreshBtn').addEventListener('click', async ()=>{
+  const btn = $('refreshBtn'); btn.classList.add('spin');
+  if(state.city){ const w = await fetchWeather(state.city.lat, state.city.lon); state.weather = w; renderCityBanner(state.city, w); render(); }
+  setTimeout(()=>btn.classList.remove('spin'), 700);
+});
+
+/* ---------- boot ---------- */
+(async function boot(){
+  let start = DEFAULT_CITY;
+  try{
+    const saved = localStorage.getItem('floodsight_city');
+    if(saved) start = JSON.parse(saved);
+  }catch(e){}
+  await loadCity(start);
+})();
+</script>
+</body>
+</html>

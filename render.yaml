@@ -1,0 +1,12 @@
+# Render Blueprint — deploys FloodSight as a free web service.
+# With this file in your repo, Render can deploy in one click:
+#   render.com → New → Blueprint → connect repo.
+services:
+  - type: web
+    name: floodsight-world
+    runtime: node
+    plan: free
+    buildCommand: ""            # zero dependencies — nothing to build
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true

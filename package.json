@@ -1,0 +1,13 @@
+{
+  "name": "floodsight-india",
+  "version": "1.0.0",
+  "description": "FloodSight India — urban flood forecasting dashboard with live Open-Meteo weather for any Indian city. Zero dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["flood", "forecast", "dashboard", "open-meteo", "india"],
+  "license": "MIT",
+  "engines": { "node": ">=16" }
+}
